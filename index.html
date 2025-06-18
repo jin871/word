@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>オンライン ワードウルフ</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            text-align: center;
+            background-color: #f0f2f5;
+            color: #1c1e21;
+            padding: 15px;
+            margin: 0;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px auto;
+            max-width: 500px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        h1 { color: #1877f2; }
+        h2 { color: #333; border-bottom: 2px solid #f0f2f5; padding-bottom: 10px; margin-bottom: 20px; }
+        input[type="text"], input[type="number"] {
+            width: calc(100% - 24px);
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #dddfe2;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+        button {
+            width: 100%;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            background-color: #1877f2;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            transition: background-color 0.3s;
+            margin-top: 10px;
+        }
+        button:hover { background-color: #166fe5; }
+        button:disabled { background-color: #a0bdf0; cursor: not-allowed; }
+        .secondary-button { background-color: #e4e6eb; color: #4b4f56; }
+        .secondary-button:hover { background-color: #d8dade; }
+        .danger-button { background-color: #e02c4f; }
+        .danger-button:hover { background-color: #c72747; }
+        #player-list { list-style: none; padding: 0; }
+        #player-list li { background-color: #f0f2f5; padding: 10px; border-radius: 6px; margin-bottom: 8px; }
+        #room-id-display { font-weight: bold; background-color: #e7f3ff; color: #1877f2; padding: 10px; border-radius: 6px; user-select: all; cursor: pointer; }
+        #word-display h3 { font-size: 2.2em; color: #fa383e; margin: 10px 0; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <h1>オンライン ワードウルフ</h1>
+
+    <div id="lobby-screen" class="container">
+        <h2>ようこそ！</h2>
+        <input type="text" id="player-name" placeholder="あなたの名前を入力">
+        
+        <div id="create-room-section">
+            <button id="create-room-button">部屋を作る</button>
+        </div>
+        
+        <hr style="margin: 20px 0; border: 1px solid #f0f2f5;">
+
+        <div id="join-room-section">
+            <input type="text" id="room-id-input" placeholder="部屋IDを入力">
+            <button id="join-room-button" class="secondary-button">部屋に入る</button>
+        </div>
+    </div>
+
+    <div id="waiting-screen" class="container hidden">
+        <h2>待機中...</h2>
+        <p>部屋IDを友達に教えて、全員が揃うのを待ってね。</p>
+        <p>部屋ID: <span id="room-id-display"></span></p>
+        <h3>参加者リスト</h3>
+        <ul id="player-list"></ul>
+        <button id="start-game-button" class="hidden">ゲーム開始 (ホストのみ)</button>
+    </div>
+    
+    <div id="game-screen" class="container hidden">
+        <h2 id="game-header">話し合いの時間です</h2>
+        <p>自分のお題を確認して、誰がワードウルフか探りましょう。</p>
+        <button id="show-word-button">あなたのお題を見る</button>
+        <div id="word-display" class="hidden">
+            <p>あなたのお題は...</p>
+            <h3 id="assigned-word"></h3>
+            <button id="hide-word-button" class="secondary-button">お題を隠す</button>
+        </div>
+        <button id="show-result-button" class="danger-button hidden">結果を見る (ホストのみ)</button>
+    </div>
+
+    <div id="result-screen" class="container hidden">
+        <h2>結果発表</h2>
+        <p id="result-text"></p>
+        <button id="restart-game-button" class="hidden">もう一度このメンバーで遊ぶ (ホストのみ)</button>
+    </div>
+
+    <script type="module">
+        // Firebase SDKをインポート
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getDatabase, ref, set, onValue, onDisconnect, remove, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+        // ======================================================
+        // TODO: あなたのFirebaseプロジェクトの設定情報に書き換えてください
+        // ======================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDL_gm2Vv3BrRskvzPUi4yParr9weXLAT0",
+            authDomain: "blackjack-fa1d3.firebaseapp.com",
+            databaseURL: "https://blackjack-fa1d3-default-rtdb.firebaseio.com",
+            projectId: "blackjack-fa1d3",
+            storageBucket: "blackjack-fa1d3.firebasestorage.app",
+            messagingSenderId: "948904325337",
+            appId: "1:948904325337:web:b86e21e40036c477944ec8",
+            measurementId: "G-CN3ZH27WS9"
+        };
+        // ======================================================
+        
+        // Firebaseの初期化
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // お題リスト
+        const wordPairs = [
+            { majority: 'りんご', minority: '赤ピーマン' }, { majority: 'そば', minority: 'うどん' },
+            { majority: 'おにぎり', minority: 'サンドイッチ' }, { majority: 'しょうゆ', minority: 'ソース' },
+            { majority: '市民', minority: 'ウルフ' }, { majority: 'Tシャツ', minority: 'Yシャツ' },
+            { majority: '扇風機', minority: 'エアコン' }, { majority: '自転車', minority: 'バイク' },
+        ];
+        
+        // HTML要素の取得
+        const screens = {
+            lobby: document.getElementById('lobby-screen'),
+            waiting: document.getElementById('waiting-screen'),
+            game: document.getElementById('game-screen'),
+            result: document.getElementById('result-screen')
+        };
+        const playerNameInput = document.getElementById('player-name');
+        const roomIdInput = document.getElementById('room-id-input');
+        const createRoomBtn = document.getElementById('create-room-button');
+        const joinRoomBtn = document.getElementById('join-room-button');
+        const roomIdDisplay = document.getElementById('room-id-display');
+        const playerList = document.getElementById('player-list');
+        const startGameBtn = document.getElementById('start-game-button');
+        const showWordBtn = document.getElementById('show-word-button');
+        const hideWordBtn = document.getElementById('hide-word-button');
+        const wordDisplay = document.getElementById('word-display');
+        const assignedWord = document.getElementById('assigned-word');
+        const showResultBtn = document.getElementById('show-result-button');
+        const resultScreen = document.getElementById('result-screen');
+        const resultText = document.getElementById('result-text');
+        const restartGameBtn = document.getElementById('restart-game-button');
+
+        // ゲーム状態を管理する変数
+        let currentRoomId = null;
+        let currentPlayerId = sessionStorage.getItem('playerId') || `player_${Date.now()}`;
+        sessionStorage.setItem('playerId', currentPlayerId);
+        let isHost = false;
+        let roomStateUnsubscribe = null;
+
+        // ===== イベントリスナー =====
+        createRoomBtn.addEventListener('click', handleCreateRoom);
+        joinRoomBtn.addEventListener('click', handleJoinRoom);
+        startGameBtn.addEventListener('click', handleStartGame);
+        showWordBtn.addEventListener('click', handleShowWord);
+        hideWordBtn.addEventListener('click', () => wordDisplay.classList.add('hidden'));
+        showResultBtn.addEventListener('click', handleShowResult);
+        restartGameBtn.addEventListener('click', handleRestartGame);
+        
+        // ===== 関数 =====
+
+        // 画面を切り替える関数
+        function switchScreen(screenName) {
+            Object.values(screens).forEach(screen => screen.classList.add('hidden'));
+            if (screens[screenName]) {
+                screens[screenName].classList.remove('hidden');
+            }
+        }
+
+        // 部屋を作成する処理
+        async function handleCreateRoom() {
+            const playerName = playerNameInput.value.trim();
+            if (!playerName) { alert('名前を入力してください。'); return; }
+
+            isHost = true;
+            currentRoomId = Math.random().toString(36).substring(2, 7).toUpperCase(); // ランダムな5桁の部屋ID
+            
+            const roomRef = ref(db, 'rooms/' + currentRoomId);
+            await set(roomRef, {
+                hostId: currentPlayerId,
+                state: 'waiting',
+                players: {
+                    [currentPlayerId]: { name: playerName }
+                }
+            });
+
+            setupOnDisconnect(currentRoomId, currentPlayerId);
+            listenToRoomUpdates(currentRoomId);
+        }
+
+        // 部屋に参加する処理
+        async function handleJoinRoom() {
+            const playerName = playerNameInput.value.trim();
+            const roomId = roomIdInput.value.trim().toUpperCase();
+            if (!playerName || !roomId) { alert('名前と部屋IDを入力してください。'); return; }
+
+            const roomRef = ref(db, `rooms/${roomId}`);
+            const roomSnapshot = await get(roomRef);
+
+            if (!roomSnapshot.exists()) {
+                alert('その部屋は存在しません。');
+                return;
+            }
+
+            isHost = false;
+            currentRoomId = roomId;
+
+            const playerRef = ref(db, `rooms/${currentRoomId}/players/${currentPlayerId}`);
+            await set(playerRef, { name: playerName });
+            
+            setupOnDisconnect(currentRoomId, currentPlayerId);
+            listenToRoomUpdates(currentRoomId);
+        }
+
+        // 部屋の状態を監視する処理
+        function listenToRoomUpdates(roomId) {
+            const roomRef = ref(db, 'rooms/' + roomId);
+            roomStateUnsubscribe = onValue(roomRef, (snapshot) => {
+                if (!snapshot.exists()) {
+                    alert('ホストが部屋を解散しました。');
+                    location.reload();
+                    return;
+                }
+                const roomData = snapshot.val();
+                renderScreen(roomData);
+            });
+        }
+        
+        // 画面の表示を更新する処理
+        function renderScreen(roomData) {
+            // プレイヤーリストの更新
+            playerList.innerHTML = '';
+            if (roomData.players) {
+                Object.values(roomData.players).forEach(player => {
+                    const li = document.createElement('li');
+                    li.textContent = player.name + (Object.keys(roomData.players)[Object.values(roomData.players).indexOf(player)] === roomData.hostId ? ' (ホスト)' : '');
+                    playerList.appendChild(li);
+                });
+            }
+
+            // ゲームの状態に応じて画面を切り替え
+            switch (roomData.state) {
+                case 'waiting':
+                    switchScreen('waiting');
+                    roomIdDisplay.textContent = currentRoomId;
+                    startGameBtn.classList.toggle('hidden', !isHost);
+                    startGameBtn.disabled = Object.keys(roomData.players).length < 3;
+                    break;
+                case 'playing':
+                    switchScreen('game');
+                    showResultBtn.classList.toggle('hidden', !isHost);
+                    break;
+                case 'result':
+                    switchScreen('result');
+                    const wolfPlayer = roomData.players[roomData.wolfPlayerId];
+                    const resultMessage = `
+                        ワードウルフは <strong>${wolfPlayer.name}</strong> でした！
+                        <br><br>
+                        お題は...<br>
+                        市民: 「${roomData.wordPair.majority}」<br>
+                        ウルフ: 「${roomData.wordPair.minority}」
+                    `;
+                    resultText.innerHTML = resultMessage;
+                    restartGameBtn.classList.toggle('hidden', !isHost);
+                    break;
+            }
+        }
+        
+        // ゲームを開始する処理 (ホストのみ)
+        function handleStartGame() {
+            const roomRef = ref(db, 'rooms/' + currentRoomId);
+            get(roomRef).then(snapshot => {
+                const roomData = snapshot.val();
+                const playerIds = Object.keys(roomData.players);
+                if (playerIds.length < 3) {
+                    alert('3人以上でないと開始できません。');
+                    return;
+                }
+                const wolfPlayerId = playerIds[Math.floor(Math.random() * playerIds.length)];
+                const wordPair = wordPairs[Math.floor(Math.random() * wordPairs.length)];
+                
+                set(ref(db, `rooms/${currentRoomId}/state`), 'playing');
+                set(ref(db, `rooms/${currentRoomId}/wolfPlayerId`), wolfPlayerId);
+                set(ref(db, `rooms/${currentRoomId}/wordPair`), wordPair);
+            });
+        }
+
+        // 自分のお題を表示する処理
+        function handleShowWord() {
+            get(ref(db, 'rooms/' + currentRoomId)).then(snapshot => {
+                const roomData = snapshot.val();
+                const myWord = (currentPlayerId === roomData.wolfPlayerId) ? roomData.wordPair.minority : roomData.wordPair.majority;
+                assignedWord.textContent = myWord;
+                wordDisplay.classList.remove('hidden');
+            });
+        }
+        
+        // 結果を表示する処理 (ホストのみ)
+        function handleShowResult() {
+            set(ref(db, `rooms/${currentRoomId}/state`), 'result');
+        }
+
+        // ゲームをリスタートする処理 (ホストのみ)
+        function handleRestartGame() {
+            const roomRef = ref(db, 'rooms/' + currentRoomId);
+            remove(ref(db, `rooms/${currentRoomId}/wolfPlayerId`));
+            remove(ref(db, `rooms/${currentRoomId}/wordPair`));
+            set(ref(db, `rooms/${currentRoomId}/state`), 'waiting');
+        }
+        
+        // ブラウザを閉じた時にプレイヤーデータを削除する設定
+        function setupOnDisconnect(roomId, playerId) {
+            const playerRef = ref(db, `rooms/${roomId}/players/${playerId}`);
+            onDisconnect(playerRef).remove();
+
+            // ホストが切断したら部屋ごと削除
+            if (isHost) {
+                const roomRef = ref(db, `rooms/${roomId}`);
+                onDisconnect(roomRef).remove();
+            }
+        }
+    </script>
+</body>
+</html>
