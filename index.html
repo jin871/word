@@ -88,9 +88,8 @@
         <button id="restart-game-button" class="hidden">もう一度このメンバーで遊ぶ (ホストのみ)</button>
     </div>
 
-
     <script type="module">
-        // Firebase SDK (変更なし)
+        // Firebase SDKをインポート
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getDatabase, ref, set, onValue, onDisconnect, remove, get, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
@@ -109,15 +108,25 @@
         };
         // ======================================================
         
-        // --- 初期設定 (一部変更) ---
+        // Firebaseの初期化
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
+
+        // ここにお題のペアを自由に追加・編集してください
         const wordPairs = [
-            { majority: 'りんご', minority: '赤ピーマン' }, { majority: 'そば', minority: 'うどん' },
-            { majority: 'おにぎり', minority: 'サンドイッチ' }, { majority: 'しょうゆ', minority: 'ソース' },
-            { majority: '市民', minority: 'ウルフ' }, { majority: 'Tシャツ', minority: 'Yシャツ' },
-            { majority: '扇風機', minority: 'エアコン' }, { majority: '自転車', minority: 'バイク' },
+            { majority: '海', minority: '山' },
+            { majority: '犬', minority: '猫' },
+            { majority: 'そば', minority: 'うどん' },
+            { majority: 'Tシャツ', minority: 'Yシャツ' },
+            { majority: 'おにぎり', minority: 'サンドイッチ' },
+            { majority: '多数派', minority: '少数派' },
+            { majority: 'サングラス', minority: 'メガネ' },
+            { majority: 'シャンプー', minority: 'リンス' },
+            { majority: 'こしあん', minority: 'つぶあん' },
+            { majority: 'きのこの山', minority: 'たけのこの里' }
         ];
+        
+        // --- HTML要素の取得 ---
         const screens = {
             lobby: document.getElementById('lobby-screen'),
             waiting: document.getElementById('waiting-screen'),
@@ -130,7 +139,6 @@
             voting: document.getElementById('phase-voting'),
             waiting: document.getElementById('phase-waiting-for-others')
         };
-        // HTML要素の取得 (追加・変更あり)
         const playerNameInput = document.getElementById('player-name'), roomIdInput = document.getElementById('room-id-input'), createRoomBtn = document.getElementById('create-room-button'), joinRoomBtn = document.getElementById('join-room-button');
         const roomIdDisplay = document.getElementById('room-id-display'), playerList = document.getElementById('player-list'), startGameBtn = document.getElementById('start-game-button');
         const gameHeader = document.getElementById('game-header'), showWordBtn = document.getElementById('show-word-button'), wordDisplay = document.getElementById('word-display'), assignedWord = document.getElementById('assigned-word'), hideWordBtn = document.getElementById('hide-word-button'), proceedToVoteBtn = document.getElementById('proceed-to-vote-button');
@@ -138,16 +146,16 @@
         const roundResultHeader = document.getElementById('round-result-header'), voteTallyDisplay = document.getElementById('vote-tally-display'), eliminationResult = document.getElementById('elimination-result'), nextRoundBtn = document.getElementById('next-round-button');
         const finalWinnerText = document.getElementById('final-winner-text'), roleRevealList = document.getElementById('role-reveal-list'), restartGameBtn = document.getElementById('restart-game-button');
         
-        // ゲーム状態変数 (変更なし)
+        // --- ゲーム状態変数 ---
         let currentRoomId = null, currentPlayerId = sessionStorage.getItem('playerId') || `player_${Date.now()}`;
         sessionStorage.setItem('playerId', currentPlayerId);
         let isHost = false, roomStateUnsubscribe = null;
 
-        // --- イベントリスナー (追加・変更あり) ---
+        // --- イベントリスナー ---
         createRoomBtn.addEventListener('click', handleCreateRoom);
         joinRoomBtn.addEventListener('click', handleJoinRoom);
         startGameBtn.addEventListener('click', handleStartGame);
-        showWordBtn.addEventListener('click', handleShowWord);
+        // showWordBtnのイベントリスナーはlistenToRoomUpdates内で動的に設定
         hideWordBtn.addEventListener('click', () => wordDisplay.classList.add('hidden'));
         proceedToVoteBtn.addEventListener('click', () => update(ref(db, `rooms/${currentRoomId}`), { phase: 'voting' }));
         submitVoteBtn.addEventListener('click', handleSubmitVote);
@@ -194,14 +202,12 @@
                 }
                 const roomData = snapshot.val();
                 // イベントリスナーを最新のデータで更新
-                showWordBtn.onclick = () => handleShowWord(roomData); 
+                showWordBtn.onclick = () => handleShowWord(roomData);
                 renderScreen(roomData);
             });
         }
         
-        // --- 画面描画のメインロジック (大幅変更) ---
         function renderScreen(roomData) {
-            // 全画面共通: プレイヤーリスト更新
             playerList.innerHTML = '';
             const allPlayers = roomData.players || {};
             Object.entries(allPlayers).forEach(([id, player]) => {
@@ -211,7 +217,6 @@
                 playerList.appendChild(li);
             });
 
-            // ゲームの状態に応じた画面表示
             switch (roomData.state) {
                 case 'waiting':
                     switchScreen('waiting');
@@ -237,7 +242,10 @@
                 switchScreen('game');
                 switchPhase('waiting');
                 gameHeader.textContent = "あなたは追放されました。ゲームの行方を見守りましょう。";
+                Object.values(gamePhases.discussion.children).forEach(el => el.classList.add('hidden'));
                 return;
+            } else {
+                 Object.values(gamePhases.discussion.children).forEach(el => el.classList.remove('hidden'));
             }
 
             switchScreen('game');
@@ -254,7 +262,6 @@
                         switchPhase('waiting');
                     } else {
                         switchPhase('voting');
-                        // 投票選択肢の生成
                         voteOptions.innerHTML = '';
                         const livingPlayers = Object.entries(roomData.players).filter(([id, p]) => p.isAlive && id !== currentPlayerId);
                         livingPlayers.forEach(([id, player]) => {
@@ -271,8 +278,6 @@
         function renderRoundResultScreen(roomData) {
             switchScreen('roundResult');
             roundResultHeader.textContent = `第${roomData.round}ラウンド 投票結果`;
-            
-            // 投票の内訳を表示
             voteTallyDisplay.innerHTML = '<h4>投票の内訳</h4>';
             const votes = roomData.votes || {};
             Object.entries(votes).forEach(([voterId, targetId]) => {
@@ -280,7 +285,6 @@
                 p.textContent = `${roomData.players[voterId].name} → ${roomData.players[targetId].name}`;
                 voteTallyDisplay.appendChild(p);
             });
-
             const eliminatedPlayer = roomData.players[roomData.lastEliminatedId];
             eliminationResult.textContent = `投票の結果、${eliminatedPlayer.name}さんが追放されました。`;
             nextRoundBtn.classList.toggle('hidden', !isHost);
@@ -300,7 +304,6 @@
             restartGameBtn.classList.toggle('hidden', !isHost);
         }
 
-        // --- ゲーム進行ロジック (大幅変更) ---
         async function handleStartGame() {
             const roomRef = ref(db, 'rooms/' + currentRoomId);
             const snapshot = await get(roomRef);
@@ -312,38 +315,28 @@
             const wolfCount = playerIds.length >= 4 ? 2 : 1;
             const wolfPlayerIds = {};
             shuffledPlayerIds.slice(0, wolfCount).forEach(id => wolfPlayerIds[id] = true);
-            
             const wordPair = wordPairs[Math.floor(Math.random() * wordPairs.length)];
             
             await update(roomRef, {
-                state: 'playing',
-                phase: 'discussion',
-                round: 1,
-                wolfPlayerIds: wolfPlayerIds,
-                wordPair: wordPair,
-                eliminatedPlayers: null,
-                votes: null,
+                state: 'playing', phase: 'discussion', round: 1,
+                wolfPlayerIds: wolfPlayerIds, wordPair: wordPair,
+                eliminatedPlayers: null, votes: null,
             });
         }
         
         function handleShowWord(roomData) {
-            // 引数で渡された最新のroomDataを直接利用する
-            if (!roomData || !roomData.wolfPlayerIds || !roomData.wordPair) {
-                console.error("役職データがまだありません。");
-                return;
-            }
+            if (!roomData || !roomData.wolfPlayerIds || !roomData.wordPair) { return; }
             const isWolf = roomData.wolfPlayerIds[currentPlayerId];
             assignedWord.textContent = isWolf ? roomData.wordPair.minority : roomData.wordPair.majority;
             wordDisplay.classList.remove('hidden');
         }
-        
+
         async function handleSubmitVote() {
             const selectedOption = document.querySelector('input[name="vote"]:checked');
             if (!selectedOption) { alert('投票する人を選んでください。'); return; }
             const targetId = selectedOption.value;
             await set(ref(db, `rooms/${currentRoomId}/votes/${currentPlayerId}`), targetId);
 
-            // 全員の投票が完了したかチェック (ホストが行う)
             if (isHost) {
                 const roomSnapshot = await get(ref(db, 'rooms/' + currentRoomId));
                 const roomData = roomSnapshot.val();
@@ -373,10 +366,7 @@
                 }
             });
 
-            // 同数票の場合はランダムで1人選ぶ
             const eliminatedId = mostVotedIds[Math.floor(Math.random() * mostVotedIds.length)];
-
-            // データベースを更新
             const updates = {};
             updates[`/players/${eliminatedId}/isAlive`] = false;
             updates['/state'] = 'round_result';
@@ -389,7 +379,6 @@
             const snapshot = await get(roomRef);
             const roomData = snapshot.val();
             
-            // 勝利条件の判定
             const livingPlayers = Object.entries(roomData.players).filter(([id, p]) => p.isAlive);
             const livingWolves = livingPlayers.filter(([id, p]) => roomData.wolfPlayerIds[id]);
             const livingCitizens = livingPlayers.filter(([id, p]) => !roomData.wolfPlayerIds[id]);
@@ -402,21 +391,16 @@
             }
 
             if (winner) {
-                // ゲーム終了
                 await update(roomRef, { state: 'finished', winner: winner });
             } else {
-                // 次のラウンドへ
                 await update(roomRef, {
-                    state: 'playing',
-                    phase: 'discussion',
-                    round: roomData.round + 1,
-                    votes: null
+                    state: 'playing', phase: 'discussion',
+                    round: roomData.round + 1, votes: null
                 });
             }
         }
         
         async function handleRestartGame() {
-            // プレイヤーの生死状態をリセットして待機画面に戻す
             const roomRef = ref(db, 'rooms/' + currentRoomId);
             const snapshot = await get(ref(db, `rooms/${currentRoomId}/players`));
             const players = snapshot.val();
@@ -425,23 +409,17 @@
                 updates[`/players/${id}/isAlive`] = true;
             });
             updates['/state'] = 'waiting';
-            updates['/round'] = null;
-            updates['/phase'] = null;
-            updates['/wolfPlayerIds'] = null;
-            updates['/wordPair'] = null;
-            updates['/votes'] = null;
-            updates['/winner'] = null;
+            updates['/round'] = null; updates['/phase'] = null; updates['/wolfPlayerIds'] = null;
+            updates['/wordPair'] = null; updates['/votes'] = null; updates['/winner'] = null;
             updates['/lastEliminatedId'] = null;
-
             await update(roomRef, updates);
         }
 
-        function setupOnDisconnect(roomId, playerId) { /* 変更なし */
+        function setupOnDisconnect(roomId, playerId) {
             const playerRef = ref(db, `rooms/${roomId}/players/${playerId}`);
             onDisconnect(playerRef).remove();
             if (isHost) { onDisconnect(ref(db, `rooms/${roomId}`)).remove(); }
         }
-
     </script>
 </body>
 </html>
