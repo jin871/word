@@ -187,8 +187,14 @@
             const roomRef = ref(db, 'rooms/' + roomId);
             if (roomStateUnsubscribe) roomStateUnsubscribe();
             roomStateUnsubscribe = onValue(roomRef, (snapshot) => {
-                if (!snapshot.exists()) { alert('ホストが部屋を解散しました。'); location.reload(); return; }
+                if (!snapshot.exists()) {
+                    alert('ホストが部屋を解散しました。');
+                    location.reload();
+                    return;
+                }
                 const roomData = snapshot.val();
+                // イベントリスナーを最新のデータで更新
+                showWordBtn.onclick = () => handleShowWord(roomData); 
                 renderScreen(roomData);
             });
         }
@@ -320,15 +326,17 @@
             });
         }
         
-        function handleShowWord() {
-            get(ref(db, 'rooms/' + currentRoomId)).then(snapshot => {
-                const roomData = snapshot.val();
-                const isWolf = roomData.wolfPlayerIds && roomData.wolfPlayerIds[currentPlayerId];
-                assignedWord.textContent = isWolf ? roomData.wordPair.minority : roomData.wordPair.majority;
-                wordDisplay.classList.remove('hidden');
-            });
+        function handleShowWord(roomData) {
+            // 引数で渡された最新のroomDataを直接利用する
+            if (!roomData || !roomData.wolfPlayerIds || !roomData.wordPair) {
+                console.error("役職データがまだありません。");
+                return;
+            }
+            const isWolf = roomData.wolfPlayerIds[currentPlayerId];
+            assignedWord.textContent = isWolf ? roomData.wordPair.minority : roomData.wordPair.majority;
+            wordDisplay.classList.remove('hidden');
         }
-
+        
         async function handleSubmitVote() {
             const selectedOption = document.querySelector('input[name="vote"]:checked');
             if (!selectedOption) { alert('投票する人を選んでください。'); return; }
