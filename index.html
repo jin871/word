@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>オンライン人狼ワードウルフ</title>
+    <title>ワードウルフ</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; text-align: center; background-color: #f0f2f5; color: #1c1e21; padding: 15px; margin: 0; }
         .container { background-color: #ffffff; border-radius: 8px; padding: 20px; margin: 20px auto; max-width: 500px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
@@ -113,17 +113,46 @@
         const db = getDatabase(app);
 
         // ここにお題のペアを自由に追加・編集してください
+        // ここにお題のペアを自由に追加・編集してください
         const wordPairs = [
+            // 基本的なお題
             { majority: '海', minority: '山' },
             { majority: '犬', minority: '猫' },
             { majority: 'そば', minority: 'うどん' },
             { majority: 'Tシャツ', minority: 'Yシャツ' },
             { majority: 'おにぎり', minority: 'サンドイッチ' },
-            { majority: '多数派', minority: '少数派' },
             { majority: 'サングラス', minority: 'メガネ' },
-            { majority: 'シャンプー', minority: 'リンス' },
+
+            // 食べ物・飲み物系
+            { majority: 'カレーライス', minority: 'ハヤシライス' },
+            { majority: '牛乳', minority: '豆乳' },
+            { majority: 'きのこの山', minority: 'たけのこの里' },
             { majority: 'こしあん', minority: 'つぶあん' },
-            { majority: 'きのこの山', minority: 'たけのこの里' }
+            { majority: 'マヨネーズ', minority: 'ケチャップ' },
+            { majority: 'みそ汁', minority: 'スープ' },
+
+            // 道具・乗り物系
+            { majority: '鉛筆', minority: 'シャープペンシル' },
+            { majority: 'スマートフォン', minority: 'タブレット' },
+            { majority: 'ハサミ', minority: 'カッター' },
+            { majority: 'タクシー', minority: 'バス' },
+
+            // 場所・建物系
+            { majority: '北海道', minority: '沖縄' },
+            { majority: '東京タワー', minority: 'スカイツリー' },
+            { majority: 'コンビニ', minority: 'スーパー' },
+            { majority: '図書館', minority: '本屋' },
+
+            // 趣味・文化系
+            { majority: '魔法', minority: '超能力' },
+            { majority: '忍者', minority: '侍' },
+            { majority: '夏休み', minority: '冬休み' },
+            { majority: 'ディズニーランド', minority: 'USJ' },
+
+            // その他
+            { majority: '天使', minority: '悪魔' },
+            { majority: '正社員', minority: 'アルバイト' },
+            { majority: '多数派', minority: '少数派' }
         ];
         
         // --- HTML要素の取得 ---
