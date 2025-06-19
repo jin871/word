@@ -169,15 +169,36 @@
         function renderFinalResultScreen(roomData) { switchScreen('finalResult'); finalWinnerText.textContent = `${roomData.winner}チームの勝利！`; roleRevealList.innerHTML = ''; Object.entries(roomData.players).forEach(([id, player]) => { const li = document.createElement('li'); const role = roomData.wolfPlayerIds[id] ? '人狼' : '市民'; li.textContent = `${player.name}: ${role}`; if (role === '人狼') li.style.color = '#fa383e'; roleRevealList.appendChild(li); }); restartGameBtn.classList.toggle('hidden', !isHost); }
 
         async function handleStartGame() {
-            const roomRef = ref(db, 'rooms/' + currentRoomId); const snapshot = await get(roomRef); const roomData = snapshot.val();
-            const playerIds = Object.keys(roomData.players); if (playerIds.length < 3) { alert('3人以上でないと開始できません。'); return; }
+            const roomRef = ref(db, 'rooms/' + currentRoomId);
+            const snapshot = await get(roomRef);
+            const roomData = snapshot.val();
+            const playerIds = Object.keys(roomData.players);
+            if (playerIds.length < 3) {
+                alert('3人以上でないと開始できません。');
+                return;
+            }
+
             const shuffledPlayerIds = [...playerIds].sort(() => Math.random() - 0.5);
-            const wolfCount = playerIds.length >= 7 ? 2 : 1; // 7人以上で人狼2人
-            const wolfPlayerIds = {}; shuffledPlayerIds.slice(0, wolfCount).forEach(id => wolfPlayerIds[id] = true);
-            const wordPair = wordPairs[Math.floor(Math.random() * wordPairs.length)];
-            const discussionEndTime = Date.now() + DISCUSSION_TIME_SECONDS * 1000; // 5分後のタイムスタンプ
             
-            await update(roomRef, { state: 'playing', phase: 'discussion', round: 1, wolfPlayerIds, wordPair, discussionEndTime, eliminatedPlayers: null, votes: null, messages: null });
+            // ↓↓↓ この行を変更し、人狼の数を常に1人に固定しました ↓↓↓
+            const wolfCount = 1;
+
+            const wolfPlayerIds = {};
+            shuffledPlayerIds.slice(0, wolfCount).forEach(id => wolfPlayerIds[id] = true);
+            const wordPair = wordPairs[Math.floor(Math.random() * wordPairs.length)];
+            const discussionEndTime = Date.now() + DISCUSSION_TIME_SECONDS * 1000;
+            
+            await update(roomRef, {
+                state: 'playing',
+                phase: 'discussion',
+                round: 1,
+                wolfPlayerIds: wolfPlayerIds,
+                wordPair: wordPair,
+                discussionEndTime,
+                eliminatedPlayers: null,
+                votes: null,
+                messages: null
+            });
         }
         
         function handleShowWord(roomData) { if (!roomData || !roomData.wolfPlayerIds || !roomData.wordPair) { return; } const isWolf = roomData.wolfPlayerIds[currentPlayerId]; assignedWord.textContent = isWolf ? roomData.wordPair.minority : roomData.wordPair.majority; wordDisplay.classList.remove('hidden'); }
